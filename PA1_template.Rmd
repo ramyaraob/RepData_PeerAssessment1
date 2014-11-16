@@ -1,25 +1,146 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducable research Peer Assignment 1"
+author: "Ramya"
+date: "Sunday, November 16, 2014"
+output: html_document
 ---
 
+This is an R Markdown document for the assignment of Reproducable Research.
+Each of the following sections correspond to the sections mentioned in the [Reproducable research Peer Assignment 1](https://class.coursera.org/repdata-008/human_grading/view/courses/972599/assessments/3/submissions)
 
-## Loading and preprocessing the data
+Each sections describes its purpose and also displays the r code used to achieve the desired result and its corresponding result.
+
+####Section:Loading and preprocessing the data
+In this section the data will be loaded from the .csv file to a data frame and the data are modified to facilitate analysis.
+
+```{r warning=FALSE}
+library(ggplot2)
+#read from the csv file
+mainactivity<-read.csv("activity.csv")
+#convert date column to date
+mainactivity$date<-as.Date(mainactivity$date)
+#create a new data frame with all missing values omitted
+activity<-na.omit(mainactivity)
+# aggregate the data by date
+aggdatabydate <-aggregate(activity$steps, by=list(activity$date), FUN=sum, na.rm=TRUE)
+names(aggdatabydate)<-c("date","steps")
+```
+####Section:What is the average daily activity pattern?
+ In this section we are computing the activity pattern of a day.
+ This can be achieved by aggregating the date by dates and plotting total steps in a day. Along with this the mean and median of the number of steps taken are also calculated.
+ 
+ **Mean of the total number of steps taken**
+ 
+```{r warning=FALSE}
+#calculate the mean of steps
+mean(aggdatabydate$steps, na.rm=TRUE)
+```
+**Median of the total number of steps taken**
+```{r warning=FALSE}
+#caluculate the median
+median(aggdatabydate$steps)
+
+```
+**Histogram for the number of steps take per day**
+```{r warning=FALSE}
+#create a histogram for the number of steps taken per day
+graph <- qplot(x=aggdatabydate$date, y=aggdatabydate$steps, data=aggdatabydate,stat='summary', fun.y=sum, geom='bar') +
+labs(title='Number of steps taken per day',y='Number of steps', x='Date')
+plot(graph)
+```
+```{r warning=FALSE}
+#aggregate the data by interval
+aggdatabyinterval <-aggregate(activity$steps, by=list(activity$interval), FUN=sum, na.rm=TRUE)
+names(aggdatabyinterval)<-c("interval","steps")
+#plot a graph for the average steps taken in each interval
+plot(aggdatabyinterval$interval,aggdatabyinterval$steps, type="l",main='Average of steps taken in the given date range',ylab='Average steps', xlab='Interval')
+#find the interval with the maximum number of steps
+aggdatabyinterval[which.max(aggdatabyinterval$steps),]
+```
+####Section:Imputing missing values
+ 
+ In this section the incomplete cases of the data set are filled up. The values used for filling up the incomplete cases are the mean of the steps for the interval (across all dates) which is missing the steps data. Creating the histogram displays the difference in the average steps per day.
+ 
+**Total number of incomplete cases/missing values in the data set**
+```{r warning=FALSE}
+#find the number of incomplete rows in the main dataframe
+sum(is.na(mainactivity))
+```
+Updating the data frame with the mean of the interval
+```{r warning=FALSE}
+#aggregate the mean of steps the data by interval 
+aggmeandatabyinterval <-aggregate(mainactivity$steps, by=list(mainactivity$interval), FUN=mean, na.rm=TRUE)
+names(aggmeandatabyinterval)<-c("interval","steps")
+# fill the incomplete steps with the mean of that interval
+for (i in 1:nrow(mainactivity)){
+  if (is.na(mainactivity$steps[i])){
+    rowinterval <- mainactivity$interval[i]
+    rowid <- which(aggmeandatabyinterval$interval == rowinterval)
+    rowsteps <- aggmeandatabyinterval$steps[rowid]
+ 
+    mainactivity$steps[i] <- rowsteps
+  }
+}
+
+# aggregate the updated data by date
+aggfulldatabydate <-aggregate(mainactivity$steps, by=list(mainactivity$date), FUN=sum, na.rm=TRUE)
+names(aggfulldatabydate)<-c("date","steps")
+
+```
+ **Mean of the total number of steps taken after filling up missing data**
+```{r warning=FALSE}
+#calculate the mean of steps
+mean(aggfulldatabydate$steps, na.rm=TRUE)
+```
+**Median of the total number of steps taken after filling up missing data**
+```{r warning=FALSE}
+#caluculate the median
+median(aggfulldatabydate$steps)
+
+```
+
+**Difference in Mean values before and after filling up missing data**
+```{r warning=FALSE}
+mean(aggfulldatabydate$steps, na.rm=TRUE)-mean(aggdatabydate$steps, na.rm=TRUE)
+```
+**Difference in Median values before and after filling up missing data**
+```{r warning=FALSE}
+median(aggfulldatabydate$steps)-median(aggdatabydate$steps)
+```
+Plotting a graph number of steps taken per day with the updated data
+```{r warning=FALSE}
+
+#plot the number of steps taken per day using the updateddata
+graph <- qplot(x=aggfulldatabydate$date, y=aggfulldatabydate$steps, data=aggfulldatabydate,stat='summary', fun.y=sum, geom='bar') +  labs(title='Number of steps taken per day',y='Number of steps', x='Date')
+plot(graph)
+
+```
+
+
+####Section:Are there differences in activity patterns between weekdays and weekends?
+In this section we are to find out if there are any differences in the number of steps / activity between weekdays and weekends.
+The `weekdays()` function is used to determine which of the dates fall under the weekend and weekday category.For the sake of convinience two new columns are added to the dataframe indicating day corresponding to the date and a factor column indicating if a particular date is a weekday or weekend.
+When the activity is plotted, we can see the differences in the patterns for weekdays and weekends as below.
+```{r warning=FALSE}
+#create a day column to capture the day corresponding to the date
+mainactivity$day<-weekdays(mainactivity$date)
+#create a factor column indicating if the day is a weekend or a weekday
+mainactivity$daytype<-c("Weekday")
+#for all rows in the data frame, update the factor column 
+for (i in 1:nrow(mainactivity)){
+    if (mainactivity$day[i] == "Saturday" || mainactivity$day[i] == "Sunday"){
+        mainactivity$daytype[i] <- "Weekend"
+    }
+}
+#convert it to a factor column
+mainactivity$daytype<-as.factor(mainactivity$daytype)
+#aggregate data by interval and time
+aggbyintervalDay <- aggregate(mainactivity$steps,by=list(mainactivity$interval, mainactivity$daytype), FUN=mean)
+ names(aggbyintervalDay)<-c("interval","daytype","steps")
+#plot the interval vs steps for weekday and weekend
+qplot(interval, steps, data=aggbyintervalDay, geom=c("line"), xlab="Interval", ylab="Number of steps", main="Difference in activity pattern") + facet_wrap(~ daytype, ncol=1)
+```
 
 
 
-## What is mean total number of steps taken per day?
 
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
